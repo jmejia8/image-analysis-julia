@@ -1,4 +1,4 @@
-using Colors, Images, Plots, ImageView, GtkUtilities
+using Colors, Images, ImageView, GtkUtilities, GtkReactive
 
 function getImgGray(name)
     img = load(name)
@@ -23,12 +23,23 @@ function vector2Img(v, row, cols)
     return convert(Array{Gray, 2}, m)
 end
 
-function setGray(m)
-     m /= maximum(m)
-     #m = convert()
-     return convert(Array{Gray, 2}, (m))
+function setGray(m, imscale = false)
+    if imscale
+        mmin, mmax = minimum(m), maximum(m)
+        return convert(Array{Gray, 2}, (m - mmin) / (mmax - mmin))
+    end
+
+    return convert(Array{Gray, 2}, m)
 end
 
 function int(x)
     return convert(Array{Int32,1}, floor.(x))
+end
+
+function imsc(m)
+    return m / maximum(m)
+end
+
+function imrepair(m)
+    return map( x->begin if x <= 1 return  x else 1.0 end end , m)
 end
