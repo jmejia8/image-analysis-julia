@@ -1,53 +1,7 @@
 include("transformations.jl")
-
-function procrustes(A, B)
-    U, S, V = svd(B * A')  
-
-    return U * V'
-end
-
-function transformImg(img, M, b)
-    rows, cols = size(img, 1, 2)
-
-    newimg = ones(rows, cols)
-    for x = 1:cols
-        for y = 1:rows
-            xx, yy = round.(Int32,  M * [x, y] + b )
-            if !( 0 < xx <= cols) || !( 0 < yy <= rows) 
-                continue end
-
-            newimg[y, x] = img[yy, xx]
-        end
-    end
-
-    return newimg
-end
-
-function transforMat(Txy, Sxy, θ)
-    θ *= -1
-    M = eye(3, 3)
-    M[1:2, 3] = Txy
-
-    Φ = [cos(θ) -sin(θ);
-         sin(θ)  cos(θ)]
-    
-    M[1:2, 1:2] = Φ
-
-    M[1,1] *= Sxy[1] 
-    M[2,2] *= Sxy[2] 
+include("procChido.jl")
 
 
-    return M
-end
-
-function center2D(x)
-    n = size(x,2)
-    # println("X == ", x)
-    mmean = [mean(x[1,:]), mean(x[2,:]),]
-    mmean = repmat(mmean, 1, n)
-
-    return x - mmean
-end
 
 function coorTrans(coors, Txy, Sxy, θ, imcenter)
     n, m = size(coors, 1, 2)
@@ -107,17 +61,11 @@ function main()
     n, m = size(coors, 1, 2)
 
 
-    A = coors'
+    A = coors
 
     B = coorTrans(coors, Txy, Sxy, θ, imcenter)
-    B = B'
-
-    Ω = procrustes(center2D(B), center2D(A))
 
 
-    A = A'
-    B = B'
-    # return  C
     subplot(1, 3, 1)
     imshow(img, cmap=:gray)
     plot(A[3:end,1], A[3:end,2], marker=:o, lw=0, color=:red)
@@ -134,27 +82,32 @@ function main()
     subplot(1, 3, 3)
     imshow(img, cmap=:gray)
     for i in 1:5
-        s = rand()
-        B = coorTrans(coors, [0,0], [s,s], 2π*rand(), imcenter)
-        C = Ω * B'
+        # B = B'
+        # A = A'
+        # return A
+        d, Z, transform = procrustes(A, B, true, -1)
+        R, s, t = transform
 
-        C = center2D(C)
+        # C = Z
 
-        C /= maximum(C)
-        C *= 210
-        
-        C += repmat(imcenter, 1, n)
-
+        C = (s*R) * B' + t'
         C = C'
+
 
         plot(C[3:end,1], C[3:end,2], marker=:o, lw=0, color=:red)
         plot(C[1:2,1], C[1:2,2], marker=:o, lw=0, color=:blue)
+        
+        s = rand()
+        B = coorTrans(coors, [50rand(), 50rand()], [s,s], π*rand(), imcenter)
+
+       return R
+
+
     end
 
     # subplot(2, 2, 4)
     # imshow(img, cmap=:gray)
 
-    return Ω
 
 
 end
