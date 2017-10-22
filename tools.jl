@@ -1,4 +1,4 @@
-using Colors, Images, ImageView, GtkUtilities, GtkReactive
+using Colors, Images, PyPlot
 
 function getImgGray(name)
     img = load(name)
@@ -41,5 +41,7 @@ function imsc(m)
 end
 
 function imrepair(m)
-    return map( x->begin if x <= 1 return  x else 1.0 end end , m)
+    mmin, mmax = minimum(m), maximum(m)
+    return (m - mmin) / (mmax - mmin)
+    # return map( x->begin if x <= 1 return  x else 1.0 end end , m)
 end
