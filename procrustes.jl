@@ -1,115 +1,135 @@
-include("transformations.jl")
-include("procChido.jl")
+function procrustes(X, Y, doScaling = true, doReflection = "best_")
+    n, m   = size(X, 1, 2);
+    ny, my = size(Y, 1, 2);
 
-
-
-function coorTrans(coors, Txy, Sxy, θ, imcenter)
-    n, m = size(coors, 1, 2)
-    
-    # A = eye(n, 2)
-    B = eye(n, 2)
-
-    for i = 1:n
-        p = coors[i,1:2]
-        # A[i, 1:2] = p
-
-        p = p - imcenter
-        
-        p = translation(p, -reverse(Txy))
-        p = rotate(p, -θ)
-        p = myscale(p, (1./ Sxy))
-        p = p + imcenter
-
-        B[i,1:2] = p
+    if ny != n
+        error("InputSizeMismatch");
+    elseif my > m
+        error("TooManyColumns'");
     end
 
-    return B
+    # % Center at the origin.
+    muX = mean(X,1);
+    muY = mean(Y,1);
+    X0 = X - repmat(muX, n, 1);
+    Y0 = Y - repmat(muY, n, 1);
+
+    ssqX   = sum(X0 .^ 2, 1);
+    ssqY   = sum(Y0 .^ 2, 1);
+    constX = false#all(ssqX <= abs(eps((X))*n*muX) .^ 2);
+    constY = false#all(ssqY <= abs(eps((X))*n*muY) .^ 2);
+    ssqX   = sum(ssqX);
+    ssqY   = sum(ssqY);
+
+    transform = ()
+
+    # % The "centered" Frobenius norm.
+    normX = sqrt(ssqX); # == sqrt(trace(X0*X0'))
+    normY = sqrt(ssqY); # == sqrt(trace(Y0*Y0'))
+
+    # % Scale to equal (unit) norm.
+    X0 = X0 ./ normX;
+    Y0 = Y0 ./ normY;
+
+    # % Make sure they're in the same dimension space.
+    if my < m
+        Y0 = [Y0 zeros(n, m-my)];
+    end
+
+    # % The optimum rotation matrix of Y.
+    A = X0' * Y0;
+    L, D, M = svd(A);
+    T = M * L';
+    if doReflection == "best" # 'best'
+        println("algo")
+        # % Let the data decide if a reflection is needed.
+    else
+        haveReflection = det(T) < 0;
+        # % If we don't have what was asked for ...
+        if doReflection != haveReflection
+            # ... then either force a reflection, or undo one.
+            M[:,end] = -M[:,end];
+            D[end,end] = -D[end,end];
+            T = M * L';
+        end
+    end
+    
+    # % The minimized unstandardized distance D(X0,b*Y0*T) is
+    # % ||X0||^2 + b^2*||Y0||^2 - 2*b*trace(T*X0'*Y0)
+    traceTA = sum(diagm(D)); # == trace(sqrtm(A'*A)) when doReflection is 'best'
+    
+    if doScaling
+        # % The optimum scaling of Y.
+        b = traceTA * normX ./ normY;
+        
+        # % The standardized distance between X and b*Y*T+c.
+        d = 1 - traceTA .^ 2;
+
+        # if nargout > 1
+            Z = normX*traceTA * Y0 * T + repmat(muX, n, 1);
+        # end
+   
+    else # if !doScaling
+        b = 1;
+        
+        # The standardized distance between X and Y*T+c.
+        d = 1 + ssqY/ssqX - 2*traceTA*normY/normX;
+
+        # if nargout > 1
+            Z = normY*Y0 * T + repmat(muX, n, 1);
+        # end
+    end
+    
+    if true #nargout > 2
+        if my < m
+            T = T[1:my,:];
+        end
+        c = muX - b*muY*T;
+       transform = (T, b, repmat(c, n, 1));
+    end
+
+
+    return  d, Z, transform
 end
+
+
 
 function main()
-    img = imgLoad("img/nao.png", 1)
-
-    rows, cols = size(img, 1, 2)
-
-    Txy = [0,0]#[0.2rows*rand() , 0.2cols*rand()]
-    S   = rand()
-    θ   = 2π*rand()
-
-    Sxy = [S, S]
-    imcenter = [rows, cols] / 2
-
-    imgTrans = mytranform(img, Txy, Sxy, θ)
-
-   coors = [ 320 45;
-         266 95;
-         378 95;
-         148 220;
-         440 250;
-         320 320;
-         230 400;
-         300 415;
-         330 415;
-         410 415;
-         215 530;         
-         280 530;         
-         350 530;         
-         420 530;
-         270 150;     
-         390 150     
-    ]
-
-    n, m = size(coors, 1, 2)
-
-
-    A = coors
-
-    B = coorTrans(coors, Txy, Sxy, θ, imcenter)
+  coors = [ 320 45;
+           266 95;
+           378 95;
+           148 220;
+           440 250;
+           320 320;
+           230 400;
+           300 415;
+           330 415;
+           410 415;
+           215 530;         
+           280 530;         
+           350 530;         
+           420 530;
+           270 150;     
+           390 150     
+      ]
+   transformed = [
+              533.199   194.913;
+              463.392   171.61 ;
+              517.25    269.81 ;
+              297.05    128.258;
+              411.162   398.707;
+              292.082   327.153;
+              178.66    286.712;
+              199.169   355.301;
+              213.596   381.604;
+              252.066   451.747;
+               57.4641  336.074;
+               88.721   393.066;
+              122.382   454.441;
+              156.044   515.816;
+              417.092   201.565;
+              474.797   306.78 ]
 
 
-    subplot(1, 3, 1)
-    imshow(img, cmap=:gray)
-    plot(A[3:end,1], A[3:end,2], marker=:o, lw=0, color=:red)
-    plot(A[1:2,1], A[1:2,2], marker=:o, lw=0, color=:blue)
-
-    subplot(1, 3, 2)
-    imshow(imgTrans, cmap=:gray)
-    plot(B[3:end,1], B[3:end,2], marker=:o, lw=0, color=:red)
-    plot(B[1:2,1], B[1:2,2], marker=:o, lw=0, color=:blue)
-
-
-
-
-    subplot(1, 3, 3)
-    imshow(img, cmap=:gray)
-    for i in 1:5
-        # B = B'
-        # A = A'
-        # return A
-        d, Z, transform = procrustes(A, B, true, -1)
-        R, s, t = transform
-
-        # C = Z
-
-        C = (s*R) * B' + t'
-        C = C'
-
-
-        plot(C[3:end,1], C[3:end,2], marker=:o, lw=0, color=:red)
-        plot(C[1:2,1], C[1:2,2], marker=:o, lw=0, color=:blue)
-        
-        s = rand()
-        B = coorTrans(coors, [50rand(), 50rand()], [s,s], π*rand(), imcenter)
-
-       return R
-
-
-    end
-
-    # subplot(2, 2, 4)
-    # imshow(img, cmap=:gray)
-
-
-
+  procrustes(coors, transformed)
 end
-
-main()
