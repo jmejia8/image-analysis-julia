@@ -1,5 +1,5 @@
 include("tools.jl")
-plotlyjs(size = (1280, 500))
+# plotlyjs(size = (1280, 500))
 
 function calcHist(img)
     h = zeros(Int32, 256)
